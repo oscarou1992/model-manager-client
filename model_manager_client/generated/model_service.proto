@@ -1,0 +1,58 @@
+// grpc_server/proto/model_service.proto
+
+syntax = "proto3";
+
+package model_service;
+
+service ModelService {
+  rpc Chat (ChatInputItem) returns (stream ChatResponseItem); // 单条请求 + 流式响应
+  rpc BatchChat (ChatRequest) returns (ChatResponse);         // 批处理，统一返回
+}
+
+// 输入
+message ChatMessage {
+  string role = 1;
+  string content = 2;
+}
+
+message ChatInputItem {
+  string provider = 1;
+  string model_name = 2;
+  int32 priority = 3;
+
+  repeated ChatMessage messages = 4;
+  float temperature = 5;
+  float top_p = 6;
+  bool stream = 7;
+
+  int32 max_tokens = 8;
+  repeated string stop = 9;
+  map<string, float> logit_bias = 10;
+
+  string user = 11;
+  string user_id = 12;
+  string org_id = 13;
+  map<string, string> extra = 14;
+}
+
+message ChatRequest {
+  repeated ChatInputItem items = 1;
+}
+
+// 输出
+message Usage {
+  int32 prompt_tokens = 1;
+  int32 completion_tokens = 2;
+  int32 total_tokens = 3;
+}
+
+message ChatResponseItem {
+  string type = 1;
+  string content = 2;
+  Usage usage = 3;
+  string error = 4;
+}
+
+message ChatResponse {
+  repeated ChatResponseItem items = 1;
+}
