@@ -6,7 +6,7 @@ import os
 import time
 
 import grpc
-from typing import List, Optional, AsyncIterator, Union
+from typing import Optional, AsyncIterator, Union
 
 import jwt
 
@@ -37,9 +37,13 @@ class ModelManagerClient:
             jwt_token: Optional[str] = None,
             default_payload: Optional[dict] = None,
             token_expires_in: int = 3600,
+            max_retries: int = 3,  # 最大重试次数
+            retry_delay: float = 1.0,  # 初始重试延迟（秒）
     ):
         # 服务端地址
         self.server_address = server_address or os.getenv("MODEL_MANAGER_SERVER_ADDRESS")
+        if not self.server_address:
+            raise ValueError("Server address must be provided via argument or environment variable.")
 
         # JWT 配置
         self.jwt_secret_key = jwt_secret_key or os.getenv("MODEL_MANAGER_SERVER_JWT_TOKEN")
@@ -47,6 +51,10 @@ class ModelManagerClient:
         self.jwt_token = jwt_token  # 用户传入的 Token（可选）
         self.default_payload = default_payload
         self.token_expires_in = token_expires_in
+
+        # 重试配置
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
 
         # 初始化 gRPC 通道
         self.channel: Optional[grpc.aio.Channel] = None
@@ -62,11 +70,33 @@ class ModelManagerClient:
         return [("authorization", f"Bearer {self.jwt_token}")] if self.jwt_token else []
 
     async def _ensure_initialized(self):
-        if not self.channel:
-            self.channel = grpc.aio.insecure_channel(self.server_address)
-            await self.channel.channel_ready()
-            self.stub = model_service_pb2_grpc.ModelServiceStub(self.channel)
-            logger.info("✅ gRPC channel initialized")
+        """初始化gRPC通道，带重试机制"""
+        if self.channel and self.stub:
+            return
+
+        retry_count = 0
+        while retry_count <= self.max_retries:
+            try:
+                self.channel = grpc.aio.insecure_channel(self.server_address)
+                await self.channel.channel_ready()
+                self.stub = model_service_pb2_grpc.ModelServiceStub(self.channel)
+                logger.info(f"gRPC channel initialized to {self.server_address}")
+                return
+            except grpc.FutureTimeoutError as e:
+                logger.warning(f"gRPC channel initialization timed out: {str(e)}")
+            except grpc.RpcError as e:
+                logger.warning(f"gRPC channel initialization failed: {str(e)}")
+            except Exception as e:
+                logger.warning(f"Unexpected error during channel initialization: {str(e)}")
+
+            retry_count += 1
+            if retry_count > self.max_retries:
+                raise ConnectionError(f"Failed to initialize gRPC channel after {self.max_retries} retries.")
+
+            # 指数退避：延迟时间 = retry_delay * (2 ^ (retry_count - 1))
+            delay = self.retry_delay * (2 ** (retry_count - 1))
+            logger.info(f"Retrying connection (attempt {retry_count}/{self.max_retries}) after {delay:.2f}s delay...")
+            await asyncio.sleep(delay)
 
     async def _stream(self, model_request, metadata) -> AsyncIterator[ModelResponse]:
         try:
