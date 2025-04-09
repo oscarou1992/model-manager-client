@@ -1,31 +1,34 @@
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from typing import List, Union, Optional
 
-from model_manager_client.enums.providers import ProviderType
-
-
-class ChatMessage(BaseModel):
-    role: str
-    content: str
+from model_manager_client.enums import ProviderType, InvokeType
 
 
-class BaseInput(BaseModel):
-    provider: ProviderType
-    model_name: Optional[str] = None  # 支持动态覆盖模型名
-    user_context: Optional[Dict] = None
-    priority: int = 1
+class TextInput(BaseModel):
+    type: str = "input_text"  # 默认值
+    text: str
 
 
-class ChatInput(BaseInput):
-    messages: List[ChatMessage]
-    temperature: float = 1.0
-    top_p: float = 1.0
-    stream: bool = False
+class ImageInput(BaseModel):
+    type: str = "input_image"  # 默认值
+    image_url: str
 
-    max_tokens: Optional[int] = None
-    stop: Optional[List[str]] = None
-    presence_penalty: Optional[float] = None
-    frequency_penalty: Optional[float] = None
-    logit_bias: Optional[Dict[str, float]] = None
-    user: Optional[str] = None
-    extra: Optional[Dict] = None
+
+class UserContext(BaseModel):
+    org_id: str
+    user_id: str
+
+
+class ModelRequest(BaseModel):
+    model_provider: ProviderType
+    invoke_type: InvokeType = InvokeType.GENERATION
+    model_name: Optional[str] = None
+    input: List[Union[TextInput, ImageInput]]
+    stream: bool = False  # 默认值
+    instructions: Optional[str] = None
+    max_output_tokens: Optional[int] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    timeout: Optional[float] = None
+    user_context: UserContext
+    priority: Optional[int] = None

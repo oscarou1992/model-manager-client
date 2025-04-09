@@ -1,58 +1,62 @@
-// grpc_server/proto/model_service.proto
-
 syntax = "proto3";
 
 package model_service;
 
+// grpc 服务（接口）定义
 service ModelService {
-  rpc Chat (ChatInputItem) returns (stream ChatResponseItem); // 单条请求 + 流式响应
-  rpc BatchChat (ChatRequest) returns (ChatResponse);         // 批处理，统一返回
+    rpc Invoke (ModelRequestItem) returns (stream ModelResponseItem); // 单条请求 + 流式响应
 }
 
 // 输入
-message ChatMessage {
-  string role = 1;
-  string content = 2;
+message TextInput {
+    string type = 1;     // input 类型， 这里默认为 input_text
+    string text = 2;     // 文本内容
 }
 
-message ChatInputItem {
-  string provider = 1;
-  string model_name = 2;
-  int32 priority = 3;
-
-  repeated ChatMessage messages = 4;
-  float temperature = 5;
-  float top_p = 6;
-  bool stream = 7;
-
-  int32 max_tokens = 8;
-  repeated string stop = 9;
-  map<string, float> logit_bias = 10;
-
-  string user = 11;
-  string user_id = 12;
-  string org_id = 13;
-  map<string, string> extra = 14;
+message ImageInput {
+    string type = 1;          // input 类型， 这里默认为 input_image
+    string image_url = 2;     // 图片URL 或者 图片 Base64 编码
 }
 
-message ChatRequest {
-  repeated ChatInputItem items = 1;
+message InputItem {
+    oneof content {
+        TextInput text = 1;
+        ImageInput image = 2;
+    }
+}
+
+message Input {
+    repeated InputItem contents = 1;  // 支持多个输入项
+}
+
+message ModelRequestItem {
+    string model_provider = 1;               // 供应商，如 "openai", "gemini"
+    optional string model_name = 2;          // 具体模型名，如 "gpt-4", "gemini-pro"
+    string invoke_type = 3;                  // 模型调用类型：generation-生成模型调用
+    Input input = 4;                         // 传递给模型的输入内容，可以是文本、图像，用于生成响应
+    bool stream = 5;                         // 是否流式输出，默认false
+    optional string instructions = 6;        // （可选）system prompt
+    optional int32 max_output_tokens = 7;    // （可选）限制模型生成响应时的最大 token 数
+    optional float temperature = 8;          // （可选）采样温度，取值范围为 0 到 2
+    optional float top_p = 9;                // （可选）称为 nucleus sampling 的采样方法的参数，表示只考虑累计概率质量为 top_p 的 token
+    optional float timeout = 10;             // （可选）覆盖客户端默认的超时设置，单位为秒
+    string org_id = 11;                      // 组织id
+    string user_id = 12;                     // 用户id
+    optional int32 priority = 13;            // （可选、预留字段）批量调用时执行的优先级
+}
+
+message ModelRequest {
+    repeated ModelRequestItem items = 1;
 }
 
 // 输出
-message Usage {
-  int32 prompt_tokens = 1;
-  int32 completion_tokens = 2;
-  int32 total_tokens = 3;
+message ModelResponseItem {
+    string content = 1;
+    string usage = 2;
+    string raw_response = 3;
+    string error = 4;
 }
 
-message ChatResponseItem {
-  string type = 1;
-  string content = 2;
-  Usage usage = 3;
-  string error = 4;
-}
-
-message ChatResponse {
-  repeated ChatResponseItem items = 1;
+message ModelResponse {
+    repeated ModelResponseItem items = 1;
 }

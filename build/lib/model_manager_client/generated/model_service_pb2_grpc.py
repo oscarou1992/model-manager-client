@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import model_service_pb2 as model__service__pb2
+import model_manager_client.generated.model_service_pb2 as model__service__pb2
 
 GRPC_GENERATED_VERSION = '1.71.0'
 GRPC_VERSION = grpc.__version__
@@ -26,7 +26,8 @@ if _version_not_supported:
 
 
 class ModelServiceStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """grpc 服务（接口）定义
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -34,30 +35,19 @@ class ModelServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.Chat = channel.unary_stream(
-                '/model_service.ModelService/Chat',
-                request_serializer=model__service__pb2.ChatInputItem.SerializeToString,
-                response_deserializer=model__service__pb2.ChatResponseItem.FromString,
-                _registered_method=True)
-        self.BatchChat = channel.unary_unary(
-                '/model_service.ModelService/BatchChat',
-                request_serializer=model__service__pb2.ChatRequest.SerializeToString,
-                response_deserializer=model__service__pb2.ChatResponse.FromString,
+        self.Invoke = channel.unary_stream(
+                '/model_service.ModelService/Invoke',
+                request_serializer=model__service__pb2.ModelRequestItem.SerializeToString,
+                response_deserializer=model__service__pb2.ModelResponseItem.FromString,
                 _registered_method=True)
 
 
 class ModelServiceServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """grpc 服务（接口）定义
+    """
 
-    def Chat(self, request, context):
+    def Invoke(self, request, context):
         """单条请求 + 流式响应
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def BatchChat(self, request, context):
-        """批处理，统一返回
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -66,15 +56,10 @@ class ModelServiceServicer(object):
 
 def add_ModelServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'Chat': grpc.unary_stream_rpc_method_handler(
-                    servicer.Chat,
-                    request_deserializer=model__service__pb2.ChatInputItem.FromString,
-                    response_serializer=model__service__pb2.ChatResponseItem.SerializeToString,
-            ),
-            'BatchChat': grpc.unary_unary_rpc_method_handler(
-                    servicer.BatchChat,
-                    request_deserializer=model__service__pb2.ChatRequest.FromString,
-                    response_serializer=model__service__pb2.ChatResponse.SerializeToString,
+            'Invoke': grpc.unary_stream_rpc_method_handler(
+                    servicer.Invoke,
+                    request_deserializer=model__service__pb2.ModelRequestItem.FromString,
+                    response_serializer=model__service__pb2.ModelResponseItem.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -85,10 +70,11 @@ def add_ModelServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class ModelService(object):
-    """Missing associated documentation comment in .proto file."""
+    """grpc 服务（接口）定义
+    """
 
     @staticmethod
-    def Chat(request,
+    def Invoke(request,
             target,
             options=(),
             channel_credentials=None,
@@ -101,36 +87,9 @@ class ModelService(object):
         return grpc.experimental.unary_stream(
             request,
             target,
-            '/model_service.ModelService/Chat',
-            model__service__pb2.ChatInputItem.SerializeToString,
-            model__service__pb2.ChatResponseItem.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def BatchChat(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/model_service.ModelService/BatchChat',
-            model__service__pb2.ChatRequest.SerializeToString,
-            model__service__pb2.ChatResponse.FromString,
+            '/model_service.ModelService/Invoke',
+            model__service__pb2.ModelRequestItem.SerializeToString,
+            model__service__pb2.ModelResponseItem.FromString,
             options,
             channel_credentials,
             insecure,

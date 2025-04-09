@@ -22,27 +22,16 @@
 pip install model-manager-client
 ```
 
-或者从源代码安装：
-
-```bash
-git clone https://github.com/your-username/model-manager-client.git
-cd model-manager-client
-pip install -e .
-```
-
 ## 项目结构
 
 ```
-model-manager-client/
 ├── model_manager_client/
 │   ├── generated/          # gRPC 生成的代码
-│   ├── schemas/           # 数据模型定义
-│   ├── enums/            # 枚举类型定义
-│   ├── client.py         # 主要客户端实现
-│   ├── exceptions.py     # 自定义异常
+│   ├── schemas/            # 数据模型定义
+│   ├── enums/              # 枚举类型定义
+│   ├── client.py           # 主要客户端实现
+│   ├── exceptions.py       # 自定义异常
 │   └── __init__.py
-├── setup.py              # 包配置
-└── make_grpc.py         # gRPC 代码生成脚本
 ```
 
 ## 使用方法
@@ -51,8 +40,6 @@ model-manager-client/
 
 ```python
 from model_manager_client import ModelManagerClient
-from model_manager_client.schemas.inputs import ChatInput, ChatMessage
-from model_manager_client.enums.providers import ProviderType
 
 # 创建客户端实例
 client = ModelManagerClient(
@@ -61,75 +48,80 @@ client = ModelManagerClient(
 )
 ```
 
-### 单次对话示例
+### 流式调用示例
 
 ```python
 import asyncio
 
-async def chat_example():
-    # 创建对话输入
-    chat_input = ChatInput(
-        provider=ProviderType.OPENAI,  # 选择模型提供商
-        model_name="gpt-3.5-turbo",   # 可选的模型名称
-        messages=[
-            ChatMessage(role="user", content="你好，请介绍一下你自己。")
+
+async def invoke_example():
+    from model_manager_client import ModelManagerClient
+    from model_manager_client.schemas import ModelRequest, TextInput, UserContext
+    from model_manager_client.enums.providers import ProviderType
+
+    # 实例化客户端
+    client = ModelManagerClient()
+
+    # 组装请求参数
+    request_data = ModelRequest(
+        model_provider=ProviderType.OPENAI,  # 选择模型提供商
+        input=[
+            TextInput(text="你好，请介绍一下你自己。")
         ],
-        temperature=0.7,              # 可选的温度参数
-        stream=True                   # 是否使用流式响应
+        user_context=UserContext(user_id="testllm", org_id="testllm"),
+        stream=True,
     )
 
-    try:
-        # 发送请求并获取响应
-        async for response in client.chat(chat_input):
-            if response.error:
-                print(f"错误: {response.error}")
-            else:
-                print(f"响应: {response.content}")
-                if response.usage:
-                    print(f"Token 使用情况: {response.usage}")
-    finally:
-        # 关闭客户端连接
-        await client.close()
+    # 发送请求并获取响应
+    async for response in client.invoke(request_data):
+        if response.error:
+            print(f"错误: {response.error}")
+        else:
+            print(f"响应: {response.content}")
+            if response.usage:
+                print(f"Token 使用情况: {response.usage}")
+
 
 # 运行示例
-asyncio.run(chat_example())
+asyncio.run(invoke_example())
 ```
 
-### 批量对话示例
+### 非流式调用示例
 
 ```python
-async def batch_chat_example():
-    # 创建多个对话输入
-    chat_inputs = [
-        ChatInput(
-            provider=ProviderType.OPENAI,
-            messages=[ChatMessage(role="user", content="第一个问题")],
-            priority=1
-        ),
-        ChatInput(
-            provider=ProviderType.OPENAI,
-            messages=[ChatMessage(role="user", content="第二个问题")],
-            priority=2
-        )
-    ]
+import asyncio
 
-    try:
-        # 发送批量请求
-        responses = await client.batch_chat(chat_inputs)
-        
-        # 处理响应
-        for i, response in enumerate(responses, 1):
-            if response.error:
-                print(f"问题 {i} 错误: {response.error}")
-            else:
-                print(f"问题 {i} 响应: {response.content}")
-                if response.usage:
-                    print(f"问题 {i} Token 使用情况: {response.usage}")
-    finally:
-        await client.close()
+
+async def non_stream_example():
+    from model_manager_client import ModelManagerClient
+    from model_manager_client.schemas import ModelRequest, TextInput, UserContext
+    from model_manager_client.enums.providers import ProviderType
+
+    # 实例化客户端
+    client = ModelManagerClient()
+
+    # 组装请求参数
+    request_data = ModelRequest(
+        model_provider=ProviderType.OPENAI,  # 选择模型提供商
+        input=[
+            TextInput(text="你好，请介绍一下你自己。")
+        ],
+        user_context=UserContext(user_id="testllm", org_id="testllm"),
+        stream=False,  # 设置为非流式调用
+    )
+
+    # 发送请求并获取响应
+    response = await client.invoke(request_data)
+    if response.error:
+        print(f"错误: {response.error}")
+    else:
+        print(f"响应: {response.content}")
+        if response.usage:
+            print(f"Token 使用情况: {response.usage}")
+
 
 # 运行示例
-asyncio.run(batch_chat_example())
+asyncio.run(non_stream_example())
 ```
 
 ### 环境变量配置
@@ -144,6 +136,8 @@ export MODEL_MANAGER_SERVER_JWT_TOKEN="your-jwt-token"
 然后创建客户端时可以不传参数：
 
 ```python
+from model_manager_client import ModelManagerClient
+
 client = ModelManagerClient()  # 将使用环境变量中的配置
 ```
 

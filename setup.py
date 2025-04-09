@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="model-manager-client",
-    version="0.1.0",
+    version="0.1.2",
     description="A Python SDK for interacting with the Model Manager gRPC service",
     author="Oscar Ou",
     author_email="oscar.ou@tamaredge.ai",
@@ -14,11 +14,12 @@ setup(
     install_requires=[
         "grpcio",
         "grpcio-tools",
-        "pydantic"
+        "pydantic",
+        "PyJWT"
     ],
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/oscarou1992/nacos_tools",
+    url="https://github.com/oscarou1992/model-manager-client",
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",

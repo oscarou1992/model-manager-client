@@ -1,67 +1,80 @@
+import asyncio
+import atexit
+import json
+import logging
 import os
+import time
 
 import grpc
-from typing import List, Iterator, Optional
+from typing import List, Optional, AsyncIterator, Union
+
+import jwt
+
 from .exceptions import ConnectionError, ValidationError
-from .schemas.inputs import ChatInput
-from .schemas.outputs import ChatResponse, UsageInfo
+from .schemas import ModelRequest, ModelResponse, TextInput, ImageInput
 from .generated import model_service_pb2, model_service_pb2_grpc
+
+logger = logging.getLogger("ModelManagerClient")
+
+
+# JWT 处理类
+class JWTAuthHandler:
+    def __init__(self, secret_key: str):
+        self.secret_key = secret_key
+
+    def encode_token(self, payload: dict, expires_in: int = 3600) -> str:
+        """生成带过期时间的 JWT Token"""
+        payload = payload.copy()
+        payload["exp"] = int(time.time()) + expires_in
+        return jwt.encode(payload, self.secret_key, algorithm="HS256")
 
 
 class ModelManagerClient:
-    def __init__(self, server_address: Optional[str] = None, jwt_token: Optional[str] = None):
+    def __init__(
+            self,
+            server_address: Optional[str] = None,
+            jwt_secret_key: Optional[str] = None,
+            jwt_token: Optional[str] = None,
+            default_payload: Optional[dict] = None,
+            token_expires_in: int = 3600,
+    ):
+        # 服务端地址
         self.server_address = server_address or os.getenv("MODEL_MANAGER_SERVER_ADDRESS")
-        self.jwt_token = jwt_token or os.getenv("MODEL_MANAGER_SERVER_JWT_TOKEN")
-        self.channel = grpc.aio.insecure_channel(self.server_address)
-        self.stub = model_service_pb2_grpc.ModelServiceStub(self.channel)
 
-    async def chat(self, input_data: ChatInput) -> Iterator[ChatResponse]:
-        """
-        流式调用 Chat 方法。
+        # JWT 配置
+        self.jwt_secret_key = jwt_secret_key or os.getenv("MODEL_MANAGER_SERVER_JWT_TOKEN")
+        self.jwt_handler = JWTAuthHandler(self.jwt_secret_key)
+        self.jwt_token = jwt_token  # 用户传入的 Token（可选）
+        self.default_payload = default_payload
+        self.token_expires_in = token_expires_in
 
-        Args:
-            input_data: ChatInput 对象，包含请求参数。
+        # 初始化 gRPC 通道
+        self.channel: Optional[grpc.aio.Channel] = None
+        self.stub: Optional[model_service_pb2_grpc.ModelServiceStub] = None
+        self._closed = False
 
-        Yields:
-            ChatResponse: 流式返回的响应对象。
+        # 注册进程退出自动关闭
+        atexit.register(self._safe_sync_close)
 
-        Raises:
-            ValidationError: 输入验证失败。
-            ConnectionError: 连接服务端失败。
-        """
+    def _build_auth_metadata(self) -> list:
+        if not self.jwt_token and self.jwt_handler:
+            self.jwt_token = self.jwt_handler.encode_token(self.default_payload, expires_in=self.token_expires_in)
+        return [("authorization", f"Bearer {self.jwt_token}")] if self.jwt_token else []
+
+    async def _ensure_initialized(self):
+        if not self.channel:
+            self.channel = grpc.aio.insecure_channel(self.server_address)
+            await self.channel.channel_ready()
+            self.stub = model_service_pb2_grpc.ModelServiceStub(self.channel)
+            logger.info("✅ gRPC channel initialized")
+
+    async def _stream(self, model_request, metadata) -> AsyncIterator[ModelResponse]:
         try:
-            # 构建 gRPC 请求
-            request = model_service_pb2.ChatInputItem(
-                provider=input_data.provider,
-                model_name=input_data.model_name or "",
-                priority=input_data.priority,
-                messages=[model_service_pb2.ChatMessage(role=m.role, content=m.content) for m in input_data.messages],
-                temperature=input_data.temperature,
-                top_p=input_data.top_p,
-                stream=input_data.stream,
-                max_tokens=input_data.max_tokens or 0,
-                stop=input_data.stop or [],
-                logit_bias=input_data.logit_bias or {},
-                user=input_data.user or "",
-                user_id=input_data.user_id or "",
-                org_id=input_data.org_id or "",
-                extra=input_data.extra or {},
-            )
-
-            # 添加认证元数据（如果提供 JWT）
-            metadata = [("authorization", f"Bearer {self.jwt_token}")] if self.jwt_token else []
-
-            # 调用 gRPC 服务
-            async for response in self.stub.Chat(request, metadata=metadata):
-                yield ChatResponse(
-                    type=response.type,
+            async for response in self.stub.Invoke(model_request, metadata=metadata):
+                yield ModelResponse(
                     content=response.content,
-                    usage=UsageInfo(
-                        prompt_tokens=response.usage.prompt_tokens,
-                        completion_tokens=response.usage.completion_tokens,
-                        total_tokens=response.usage.total_tokens,
-                    ),
-                    raw_response=response.raw_response,
+                    usage=json.loads(response.usage) if response.usage else None,
+                    raw_response=json.loads(response.raw_response) if response.raw_response else None,
                     error=response.error or None,
                 )
         except grpc.RpcError as e:
@@ -69,66 +82,89 @@ class ModelManagerClient:
         except Exception as e:
             raise ValidationError(f"Invalid input: {str(e)}")
 
-    async def batch_chat(self, inputs: List[ChatInput]) -> List[ChatResponse]:
+    async def invoke(self, model_request: ModelRequest) -> Union[ModelResponse, AsyncIterator[ModelResponse]]:
         """
-        批量调用 BatchChat 方法。
+       通用调用模型方法。
 
         Args:
-            inputs: List[ChatInput]，包含多个请求参数。
+            model_request: ModelRequest 对象，包含请求参数。
 
-        Returns:
-            List[ChatResponse]: 批量返回的响应列表。
+        Yields:
+            ModelResponse: 支持流式或非流式的模型响应
 
         Raises:
             ValidationError: 输入验证失败。
             ConnectionError: 连接服务端失败。
         """
-        try:
-            # 构建 gRPC 请求
-            request = model_service_pb2.ChatRequest(
-                items=[
-                    model_service_pb2.ChatInputItem(
-                        provider=i.provider,
-                        model_name=i.model_name or "",
-                        priority=i.priority,
-                        messages=[model_service_pb2.ChatMessage(role=m.role, content=m.content) for m in i.messages],
-                        temperature=i.temperature,
-                        top_p=i.top_p,
-                        stream=i.stream,
-                        max_tokens=i.max_tokens or 0,
-                        stop=i.stop or [],
-                        logit_bias=i.logit_bias or {},
-                        user=i.user or "",
-                        user_id=i.user_id or "",
-                        org_id=i.org_id or "",
-                        extra=i.extra or {},
-                    ) for i in inputs
-                ]
-            )
+        await self._ensure_initialized()
 
-            # 添加认证元数据（如果提供 JWT）
-            metadata = [("authorization", f"Bearer {self.jwt_token}")] if self.jwt_token else []
+        if not self.default_payload:
+            self.default_payload = {
+                "org_id": model_request.user_context.org_id or "",
+                "user_id": model_request.user_context.user_id or ""
+            }
 
-            # 调用 gRPC 服务
-            response = await self.stub.BatchChat(request, metadata=metadata)
-            return [
-                ChatResponse(
-                    type=item.type,
-                    content=item.content,
-                    usage=UsageInfo(
-                        prompt_tokens=item.usage.prompt_tokens,
-                        completion_tokens=item.usage.completion_tokens,
-                        total_tokens=item.usage.total_tokens,
-                    ),
-                    raw_response=item.raw_response,
-                    error=item.error or None,
-                ) for item in response.items
-            ]
-        except grpc.RpcError as e:
-            raise ConnectionError(f"gRPC call failed: {str(e)}")
-        except Exception as e:
-            raise ValidationError(f"Invalid input: {str(e)}")
+        # 构造 InputItem 列表
+        input_items = []
+        for item in model_request.input:
+            if isinstance(item, TextInput):
+                input_items.append(model_service_pb2.InputItem(
+                    text=model_service_pb2.TextInput(
+                        type=item.type,
+                        text=item.text
+                    )
+                ))
+            elif isinstance(item, ImageInput):
+                input_items.append(model_service_pb2.InputItem(
+                    image=model_service_pb2.ImageInput(
+                        type=item.type,
+                        image_url=item.image_url
+                    )
+                ))
+            else:
+                raise ValidationError("Invalid input type, must be TextInput or ImageInput.")
+
+        request = model_service_pb2.ModelRequestItem(
+            model_provider=model_request.model_provider.value,
+            model_name=model_request.model_name or "",
+            invoke_type=model_request.invoke_type.value,
+            input=model_service_pb2.Input(contents=input_items),
+            stream=model_request.stream,
+            instructions=model_request.instructions or "",
+            max_output_tokens=model_request.max_output_tokens or 0,
+            temperature=model_request.temperature or 0.0,
+            top_p=model_request.top_p or 0.0,
+            timeout=model_request.timeout or 0.0,
+            org_id=model_request.user_context.org_id,
+            user_id=model_request.user_context.user_id,
+            priority=model_request.priority or 0
+        )
+
+        metadata = self._build_auth_metadata()
+
+        if model_request.stream:
+            return self._stream(request, metadata)
+        else:
+            async for response in self.stub.Invoke(request, metadata=metadata):
+                return ModelResponse(
+                    content=response.content,
+                    usage=json.loads(response.usage) if response.usage else None,
+                    raw_response=json.loads(response.raw_response) if response.raw_response else None,
+                    error=response.error or None,
+                )
 
     async def close(self):
         """关闭 gRPC 通道"""
         await self.channel.close()
+
+    def _safe_sync_close(self):
+        """进程退出时自动关闭 channel（事件循环处理兼容）"""
+        if self.channel and not self._closed:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self.close())
+                else:
+                    loop.run_until_complete(self.close())
+            except Exception as e:
+                logger.warning(f"gRPC channel close failed at exit: {e}")
