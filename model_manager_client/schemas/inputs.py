@@ -17,6 +17,7 @@ class ImageInput(BaseModel):
 class UserContext(BaseModel):
     org_id: str
     user_id: str
+    client_type: str
 
 
 class ModelRequest(BaseModel):

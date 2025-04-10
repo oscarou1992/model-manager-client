@@ -167,7 +167,8 @@ class ModelManagerClient:
             timeout=model_request.timeout or 0.0,
             org_id=model_request.user_context.org_id,
             user_id=model_request.user_context.user_id,
-            priority=model_request.priority or 0
+            client_type=model_request.user_context.client_type,
+            priority=model_request.priority or 1
         )
 
         metadata = self._build_auth_metadata()

@@ -30,8 +30,8 @@ message Input {
 }
 
 message ModelRequestItem {
-    string model_provider = 1;               // 供应商，如 "openai", "gemini"
-    optional string model_name = 2;          // 具体模型名，如 "gpt-4", "gemini-pro"
+    string model_provider = 1;               // 供应商，如 "openai", "google" 等
+    optional string model_name = 2;          // 具体模型名，如 "gpt-4o-mini", "gemini-2.0-flash" 等
     string invoke_type = 3;                  // 模型调用类型：generation-生成模型调用
     Input input = 4;                         // 传递给模型的输入内容，可以是文本、图像，用于生成响应
     bool stream = 5;                         // 是否流式输出，默认false
@@ -42,7 +42,8 @@ message ModelRequestItem {
     optional float timeout = 10;             // （可选）覆盖客户端默认的超时设置，单位为秒
     string org_id = 11;                      // 组织id
     string user_id = 12;                     // 用户id
-    optional int32 priority = 13;            // （可选、预留字段）批量调用时执行的优先级
+    string client_type = 13;                 // 客户端类型，这里记录的是哪个服务请求过来的
+    optional int32 priority = 14;            // （可选、预留字段）批量调用时执行的优先级
 }
 
 message ModelRequest {

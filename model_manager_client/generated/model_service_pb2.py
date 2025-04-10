@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13model_service.proto\x12\rmodel_service\"\'\n\tTextInput\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\"-\n\nImageInput\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x11\n\timage_url\x18\x02 \x01(\t\"l\n\tInputItem\x12(\n\x04text\x18\x01 \x01(\x0b\x32\x18.model_service.TextInputH\x00\x12*\n\x05image\x18\x02 \x01(\x0b\x32\x19.model_service.ImageInputH\x00\x42\t\n\x07\x63ontent\"3\n\x05Input\x12*\n\x08\x63ontents\x18\x01 \x03(\x0b\x32\x18.model_service.InputItem\"\xad\x03\n\x10ModelRequestItem\x12\x16\n\x0emodel_provider\x18\x01 \x01(\t\x12\x17\n\nmodel_name\x18\x02 \x01(\tH\x00\x88\x01\x01\x12\x13\n\x0binvoke_type\x18\x03 \x01(\t\x12#\n\x05input\x18\x04 \x01(\x0b\x32\x14.model_service.Input\x12\x0e\n\x06stream\x18\x05 \x01(\x08\x12\x19\n\x0cinstructions\x18\x06 \x01(\tH\x01\x88\x01\x01\x12\x1e\n\x11max_output_tokens\x18\x07 \x01(\x05H\x02\x88\x01\x01\x12\x18\n\x0btemperature\x18\x08 \x01(\x02H\x03\x88\x01\x01\x12\x12\n\x05top_p\x18\t \x01(\x02H\x04\x88\x01\x01\x12\x14\n\x07timeout\x18\n \x01(\x02H\x05\x88\x01\x01\x12\x0e\n\x06org_id\x18\x0b \x01(\t\x12\x0f\n\x07user_id\x18\x0c \x01(\t\x12\x15\n\x08priority\x18\r \x01(\x05H\x06\x88\x01\x01\x42\r\n\x0b_model_nameB\x0f\n\r_instructionsB\x14\n\x12_max_output_tokensB\x0e\n\x0c_temperatureB\x08\n\x06_top_pB\n\n\x08_timeoutB\x0b\n\t_priority\">\n\x0cModelRequest\x12.\n\x05items\x18\x01 \x03(\x0b\x32\x1f.model_service.ModelRequestItem\"X\n\x11ModelResponseItem\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\r\n\x05usage\x18\x02 \x01(\t\x12\x14\n\x0craw_response\x18\x03 \x01(\t\x12\r\n\x05\x65rror\x18\x04 \x01(\t\"@\n\rModelResponse\x12/\n\x05items\x18\x01 \x03(\x0b\x32 .model_service.ModelResponseItem2]\n\x0cModelService\x12M\n\x06Invoke\x12\x1f.model_service.ModelRequestItem\x1a .model_service.ModelResponseItem0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13model_service.proto\x12\rmodel_service\"\'\n\tTextInput\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\"-\n\nImageInput\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x11\n\timage_url\x18\x02 \x01(\t\"l\n\tInputItem\x12(\n\x04text\x18\x01 \x01(\x0b\x32\x18.model_service.TextInputH\x00\x12*\n\x05image\x18\x02 \x01(\x0b\x32\x19.model_service.ImageInputH\x00\x42\t\n\x07\x63ontent\"3\n\x05Input\x12*\n\x08\x63ontents\x18\x01 \x03(\x0b\x32\x18.model_service.InputItem\"\xc2\x03\n\x10ModelRequestItem\x12\x16\n\x0emodel_provider\x18\x01 \x01(\t\x12\x17\n\nmodel_name\x18\x02 \x01(\tH\x00\x88\x01\x01\x12\x13\n\x0binvoke_type\x18\x03 \x01(\t\x12#\n\x05input\x18\x04 \x01(\x0b\x32\x14.model_service.Input\x12\x0e\n\x06stream\x18\x05 \x01(\x08\x12\x19\n\x0cinstructions\x18\x06 \x01(\tH\x01\x88\x01\x01\x12\x1e\n\x11max_output_tokens\x18\x07 \x01(\x05H\x02\x88\x01\x01\x12\x18\n\x0btemperature\x18\x08 \x01(\x02H\x03\x88\x01\x01\x12\x12\n\x05top_p\x18\t \x01(\x02H\x04\x88\x01\x01\x12\x14\n\x07timeout\x18\n \x01(\x02H\x05\x88\x01\x01\x12\x0e\n\x06org_id\x18\x0b \x01(\t\x12\x0f\n\x07user_id\x18\x0c \x01(\t\x12\x13\n\x0b\x63lient_type\x18\r \x01(\t\x12\x15\n\x08priority\x18\x0e \x01(\x05H\x06\x88\x01\x01\x42\r\n\x0b_model_nameB\x0f\n\r_instructionsB\x14\n\x12_max_output_tokensB\x0e\n\x0c_temperatureB\x08\n\x06_top_pB\n\n\x08_timeoutB\x0b\n\t_priority\">\n\x0cModelRequest\x12.\n\x05items\x18\x01 \x03(\x0b\x32\x1f.model_service.ModelRequestItem\"X\n\x11ModelResponseItem\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12\r\n\x05usage\x18\x02 \x01(\t\x12\x14\n\x0craw_response\x18\x03 \x01(\t\x12\r\n\x05\x65rror\x18\x04 \x01(\t\"@\n\rModelResponse\x12/\n\x05items\x18\x01 \x03(\x0b\x32 .model_service.ModelResponseItem2]\n\x0cModelService\x12M\n\x06Invoke\x12\x1f.model_service.ModelRequestItem\x1a .model_service.ModelResponseItem0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -40,13 +40,13 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_INPUT']._serialized_start=236
   _globals['_INPUT']._serialized_end=287
   _globals['_MODELREQUESTITEM']._serialized_start=290
-  _globals['_MODELREQUESTITEM']._serialized_end=719
-  _globals['_MODELREQUEST']._serialized_start=721
-  _globals['_MODELREQUEST']._serialized_end=783
-  _globals['_MODELRESPONSEITEM']._serialized_start=785
-  _globals['_MODELRESPONSEITEM']._serialized_end=873
-  _globals['_MODELRESPONSE']._serialized_start=875
-  _globals['_MODELRESPONSE']._serialized_end=939
-  _globals['_MODELSERVICE']._serialized_start=941
-  _globals['_MODELSERVICE']._serialized_end=1034
+  _globals['_MODELREQUESTITEM']._serialized_end=740
+  _globals['_MODELREQUEST']._serialized_start=742
+  _globals['_MODELREQUEST']._serialized_end=804
+  _globals['_MODELRESPONSEITEM']._serialized_start=806
+  _globals['_MODELRESPONSEITEM']._serialized_end=894
+  _globals['_MODELRESPONSE']._serialized_start=896
+  _globals['_MODELRESPONSE']._serialized_end=960
+  _globals['_MODELSERVICE']._serialized_start=962
+  _globals['_MODELSERVICE']._serialized_end=1055
 # @@protoc_insertion_point(module_scope)
