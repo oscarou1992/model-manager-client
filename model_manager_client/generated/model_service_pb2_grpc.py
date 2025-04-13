@@ -40,6 +40,11 @@ class ModelServiceStub(object):
                 request_serializer=model__service__pb2.ModelRequestItem.SerializeToString,
                 response_deserializer=model__service__pb2.ModelResponseItem.FromString,
                 _registered_method=True)
+        self.BatchInvoke = channel.unary_unary(
+                '/model_service.ModelService/BatchInvoke',
+                request_serializer=model__service__pb2.ModelRequest.SerializeToString,
+                response_deserializer=model__service__pb2.ModelResponse.FromString,
+                _registered_method=True)
 
 
 class ModelServiceServicer(object):
@@ -53,6 +58,13 @@ class ModelServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def BatchInvoke(self, request, context):
+        """批量调用接口，不支持流式
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ModelServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -60,6 +72,11 @@ def add_ModelServiceServicer_to_server(servicer, server):
                     servicer.Invoke,
                     request_deserializer=model__service__pb2.ModelRequestItem.FromString,
                     response_serializer=model__service__pb2.ModelResponseItem.SerializeToString,
+            ),
+            'BatchInvoke': grpc.unary_unary_rpc_method_handler(
+                    servicer.BatchInvoke,
+                    request_deserializer=model__service__pb2.ModelRequest.FromString,
+                    response_serializer=model__service__pb2.ModelResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -90,6 +107,33 @@ class ModelService(object):
             '/model_service.ModelService/Invoke',
             model__service__pb2.ModelRequestItem.SerializeToString,
             model__service__pb2.ModelResponseItem.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def BatchInvoke(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/model_service.ModelService/BatchInvoke',
+            model__service__pb2.ModelRequest.SerializeToString,
+            model__service__pb2.ModelResponse.FromString,
             options,
             channel_credentials,
             insecure,

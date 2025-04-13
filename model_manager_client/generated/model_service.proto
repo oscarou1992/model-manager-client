@@ -5,23 +5,22 @@ package model_service;
 // grpc 服务（接口）定义
 service ModelService {
     rpc Invoke (ModelRequestItem) returns (stream ModelResponseItem); // 单条请求 + 流式响应
+    rpc BatchInvoke (ModelRequest) returns (ModelResponse);           // 批量调用接口，不支持流式
 }
 
 // 输入
 message TextInput {
-    string type = 1;     // input 类型， 这里默认为 input_text
     string text = 2;     // 文本内容
 }
 
-message ImageInput {
-    string type = 1;          // input 类型， 这里默认为 input_image
-    string image_url = 2;     // 图片URL 或者 图片 Base64 编码
+message FileInput {
+    string file_url = 1;      // 文件URL 或者 文件 Base64 编码
 }
 
 message InputItem {
     oneof content {
         TextInput text = 1;
-        ImageInput image = 2;
+        FileInput file = 2;
     }
 }
 
@@ -32,18 +31,20 @@ message Input {
 message ModelRequestItem {
     string model_provider = 1;               // 供应商，如 "openai", "google" 等
     optional string model_name = 2;          // 具体模型名，如 "gpt-4o-mini", "gemini-2.0-flash" 等
-    string invoke_type = 3;                  // 模型调用类型：generation-生成模型调用
-    Input input = 4;                         // 传递给模型的输入内容，可以是文本、图像，用于生成响应
-    bool stream = 5;                         // 是否流式输出，默认false
-    optional string instructions = 6;        // （可选）system prompt
-    optional int32 max_output_tokens = 7;    // （可选）限制模型生成响应时的最大 token 数
-    optional float temperature = 8;          // （可选）采样温度，取值范围为 0 到 2
-    optional float top_p = 9;                // （可选）称为 nucleus sampling 的采样方法的参数，表示只考虑累计概率质量为 top_p 的 token
-    optional float timeout = 10;             // （可选）覆盖客户端默认的超时设置，单位为秒
-    string org_id = 11;                      // 组织id
-    string user_id = 12;                     // 用户id
-    string client_type = 13;                 // 客户端类型，这里记录的是哪个服务请求过来的
-    optional int32 priority = 14;            // （可选、预留字段）批量调用时执行的优先级
+    optional string channel = 3;             // 渠道：不同服务商之前有不同的调用SDK，这里指定是调用哪个SDK，目前openai只有一个response，而google的可以用vertexai或者 ai-studio
+    string invoke_type = 4;                  // 模型调用类型：generation-生成模型调用
+    Input input = 5;                         // 传递给模型的输入内容，可以是文本、图像，用于生成响应
+    bool stream = 6;                         // 是否流式输出，默认false
+    optional string instructions = 7;        // （可选）system prompt
+    optional int32 max_output_tokens = 8;    // （可选）限制模型生成响应时的最大 token 数
+    optional float temperature = 9;          // （可选）采样温度，取值范围为 0 到 2
+    optional float top_p = 10;                // （可选）称为 nucleus sampling 的采样方法的参数，表示只考虑累计概率质量为 top_p 的 token
+    optional float timeout = 11;             // （可选）覆盖客户端默认的超时设置，单位为秒
+    string org_id = 12;                      // 组织id
+    string user_id = 13;                     // 用户id
+    string client_type = 14;                 // 客户端类型，这里记录的是哪个服务请求过来的
+    optional int32 priority = 15;            // （可选、预留字段）批量调用时执行的优先级
+    optional string custom_id = 16;          // （可选）用于批量请求时结果关联
 }
 
 message ModelRequest {
@@ -56,8 +57,11 @@ message ModelResponseItem {
     string usage = 2;
     string raw_response = 3;
     string error = 4;
+    optional string custom_id = 5;
+    optional string request_id = 6;
 }
 
 message ModelResponse {
-    repeated ModelResponseItem items = 1;
+    string request_id = 1;
+    repeated ModelResponseItem items = 2;
 }

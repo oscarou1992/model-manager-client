@@ -3,7 +3,7 @@ from typing import Any, Iterator, Optional, Union, Dict, List
 from pydantic import BaseModel, ConfigDict
 
 
-class ModelResponse(BaseModel):
+class BaseResponse(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     content: Optional[str] = None  # 文本输出内容
@@ -11,3 +11,14 @@ class ModelResponse(BaseModel):
     stream_response: Optional[Union[Iterator[str], Any]] = None  # 用于流式响应（同步 or 异步）
     raw_response: Optional[Union[Dict, List]] = None  # 模型服务商返回的原始结构（JSON）
     error: Optional[Any] = None
+    custom_id: Optional[str] = None
+
+
+class ModelResponse(BaseResponse):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    request_id: Optional[str] = None
+
+
+class BatchModelResponse(BaseModel):
+    request_id: Optional[str] = None
+    responses: Optional[List[BaseResponse]] = None
