@@ -1,7 +1,7 @@
 import asyncio
 import atexit
 import logging
-from typing import Optional
+from typing import Optional, Union, Iterator
 
 from .async_client import AsyncModelManagerClient
 from .schemas import ModelRequest, BatchModelRequest, ModelResponse, BatchModelResponse
@@ -47,10 +47,17 @@ class ModelManagerClient:
         )
         atexit.register(self._safe_sync_close)
 
-    def invoke(self, model_request: ModelRequest, timeout: Optional[float] = None) -> ModelResponse:
+    def invoke(self, model_request: ModelRequest, timeout: Optional[float] = None) -> Union[
+        ModelResponse, Iterator[ModelResponse]]:
         """
         同步调用单个模型任务
         """
+        if model_request.stream:
+            async def stream():
+                async for r in await self._async_client.invoke(model_request, timeout=timeout):
+                    yield r
+
+            return self._sync_wrap_async_generator(stream())
         return self._run_async(self._async_client.invoke(model_request, timeout=timeout))
 
     def invoke_batch(self, batch_model_request: BatchModelRequest,
@@ -81,3 +88,24 @@ class ModelManagerClient:
             return loop.run_until_complete(coro)
         except RuntimeError:
             return self._loop.run_until_complete(coro)
+
+    def _sync_wrap_async_generator(self, async_gen_func):
+        """
+        将 async generator 转换为同步 generator，逐条 yield。
+        """
+        loop = self._loop
+
+        # 创建异步生成器对象
+        agen = async_gen_func
+
+        class SyncGenerator:
+            def __iter__(self_inner):
+                return self_inner
+
+            def __next__(self_inner):
+                try:
+                    return loop.run_until_complete(agen.__anext__())
+                except StopAsyncIteration:
+                    raise StopIteration
+
+        return SyncGenerator()

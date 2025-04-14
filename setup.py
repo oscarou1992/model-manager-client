@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="model-manager-client",
-    version="0.1.5",
+    version="0.1.6",
     description="A Python SDK for interacting with the Model Manager gRPC service",
     author="Oscar Ou",
     author_email="oscar.ou@tamaredge.ai",
@@ -16,6 +16,7 @@ setup(
         "grpcio-tools",
         "pydantic",
         "PyJWT",
+        "nest_asyncio",
     ],
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
