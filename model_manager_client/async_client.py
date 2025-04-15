@@ -40,7 +40,7 @@ class AsyncModelManagerClient:
         self.default_invoke_timeout = float(os.getenv("MODEL_MANAGER_SERVER_INVOKE_TIMEOUT", 30.0))
 
         # JWT 配置
-        self.jwt_secret_key = jwt_secret_key or os.getenv("MODEL_MANAGER_SERVER_JWT_TOKEN")
+        self.jwt_secret_key = jwt_secret_key or os.getenv("MODEL_MANAGER_SERVER_JWT_SECRET_KEY")
         self.jwt_handler = JWTAuthHandler(self.jwt_secret_key)
         self.jwt_token = jwt_token  # 用户传入的 Token（可选）
         self.default_payload = default_payload

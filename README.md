@@ -48,15 +48,31 @@ from model_manager_client import ModelManagerClient, AsyncModelManagerClient
 # 创建同步客户端实例
 sync_client = ModelManagerClient(
     server_address="localhost:50051",  # 服务器地址
-    jwt_token="your-jwt-token"  # 可选的 JWT 认证令牌
+    jwt_token="your-jwt-token"  # JWT 认证令牌
 )
+
+# 或者固定key，然后存在加密逻辑
+sync_client_secret_key = ModelManagerClient(
+    server_address="localhost:50051",  # 服务器地址
+    jwt_secret_key="your-jwt-secret-key"  # JWT 秘钥
+)
+
 
 # 创建异步客户端实例
 async_client = AsyncModelManagerClient(
     server_address="localhost:50051",  # 服务器地址
     jwt_token="your-jwt-token"  # 可选的 JWT 认证令牌
 )
+
+# 或者固定key，然后存在加密逻辑
+async_client_secret_key = AsyncModelManagerClient(
+    server_address="localhost:50051",  # 服务器地址
+    jwt_secret_key="your-jwt-secret-key"  # JWT 秘钥
+)
 ```
+
+> 需要注意，这里的JWT存在2个字段jwt_secret_key和jwt_secret_key，两者是不一样的，一个是固定key进行加密后，另外一个是加密后传过去的token。
+> 因此这里推荐使用环境变量
 
 ### 同步调用示例
 
@@ -323,7 +339,7 @@ MODEL_MANAGER_SERVER_GRPC_DEFAULT_AUTHORITY=localhost
 # ========================
 
 # JWT 签名密钥（用于生成 Token）
-MODEL_MANAGER_SERVER_MODEL_MANAGER_SERVER_JWT_TOKEN=your_jwt_secret_key
+MODEL_MANAGER_SERVER_JWT_SECRET_KEY=your_jwt_secret_key
 
 
 # ========================
