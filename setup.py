@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="model-manager-client",
-    version="0.1.8",
+    version="0.1.11",
     description="A Python SDK for interacting with the Model Manager gRPC service",
     author="Oscar Ou",
     author_email="oscar.ou@tamaredge.ai",

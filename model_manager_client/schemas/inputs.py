@@ -19,6 +19,11 @@ class UserContext(BaseModel):
     client_type: str  # 客户端类型，这里记录的是哪个服务请求过来的
 
 
+class ThinkingConfig(BaseModel):
+    include_thoughts: bool = True  # 是否在响应中包含思考过程
+    thinking_budget: int  # 以令牌（tokens）为单位的思考预算
+
+
 class BaseRequest(BaseModel):
     model_provider: ProviderType  # 供应商，如 "openai", "google" 等
     channel: Optional[Channel] = None  # 渠道：不同服务商之前有不同的调用SDK，这里指定是调用哪个SDK
@@ -32,10 +37,11 @@ class BaseRequest(BaseModel):
     top_p: Optional[float] = None  # （可选）称为 nucleus sampling 的采样方法的参数，表示只考虑累计概率质量为 top_p 的 token
     timeout: Optional[float] = None  # （可选）覆盖客户端默认的超时设置，单位为秒
     custom_id: Optional[str] = None  # （可选）用于批量请求时结果关联
+    thinking_config: Optional[ThinkingConfig] = None  # （可选）思考功能配置
 
 
 class ModelRequest(BaseRequest):
-    user_context: UserContext # 用户信息
+    user_context: UserContext  # 用户信息
 
 
 class BatchModelRequestItem(BaseRequest):
@@ -43,5 +49,5 @@ class BatchModelRequestItem(BaseRequest):
 
 
 class BatchModelRequest(BaseModel):
-    user_context: UserContext # 用户信息
+    user_context: UserContext  # 用户信息
     items: List[BatchModelRequestItem]  # 批量请求项列表

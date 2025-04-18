@@ -167,6 +167,12 @@ class AsyncModelManagerClient:
                 ))
             else:
                 raise ValidationError("Invalid input type, must be TextInput or ImageInput.")
+        thinking_config = None
+        if model_request.thinking_config and model_request.thinking_config.thinking_budget > 0:
+            thinking_config = model_service_pb2.ThinkingConfig(
+                include_thoughts=model_request.thinking_config.include_thoughts,
+                thinking_budget=model_request.thinking_config.thinking_budget,
+            )
 
         request = model_service_pb2.ModelRequestItem(
             model_provider=model_request.model_provider.value,
@@ -185,6 +191,7 @@ class AsyncModelManagerClient:
             client_type=model_request.user_context.client_type,
             priority=1,
             custom_id=model_request.custom_id or "",
+            thinking_config=thinking_config,
         )
 
         metadata = self._build_auth_metadata()

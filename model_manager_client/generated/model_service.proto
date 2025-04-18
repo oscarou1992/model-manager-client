@@ -28,23 +28,29 @@ message Input {
     repeated InputItem contents = 1;  // 支持多个输入项
 }
 
+message ThinkingConfig {
+    bool include_thoughts = 1; // 是否在响应中包含思考过程
+    int32 thinking_budget = 2; // 以令牌（tokens）为单位的思考预算
+}
+
 message ModelRequestItem {
-    string model_provider = 1;               // 供应商，如 "openai", "google" 等
-    optional string model_name = 2;          // 具体模型名，如 "gpt-4o-mini", "gemini-2.0-flash" 等
-    optional string channel = 3;             // 渠道：不同服务商之前有不同的调用SDK，这里指定是调用哪个SDK，目前openai只有一个response，而google的可以用vertexai或者 ai-studio
-    string invoke_type = 4;                  // 模型调用类型：generation-生成模型调用
-    Input input = 5;                         // 传递给模型的输入内容，可以是文本、图像，用于生成响应
-    bool stream = 6;                         // 是否流式输出，默认false
-    optional string instructions = 7;        // （可选）system prompt
-    optional int32 max_output_tokens = 8;    // （可选）限制模型生成响应时的最大 token 数
-    optional float temperature = 9;          // （可选）采样温度，取值范围为 0 到 2
-    optional float top_p = 10;                // （可选）称为 nucleus sampling 的采样方法的参数，表示只考虑累计概率质量为 top_p 的 token
-    optional float timeout = 11;             // （可选）覆盖客户端默认的超时设置，单位为秒
-    string org_id = 12;                      // 组织id
-    string user_id = 13;                     // 用户id
-    string client_type = 14;                 // 客户端类型，这里记录的是哪个服务请求过来的
-    optional int32 priority = 15;            // （可选、预留字段）批量调用时执行的优先级
-    optional string custom_id = 16;          // （可选）用于批量请求时结果关联
+    string model_provider = 1;                      // 供应商，如 "openai", "google" 等
+    optional string model_name = 2;                 // 具体模型名，如 "gpt-4o-mini", "gemini-2.0-flash" 等
+    optional string channel = 3;                    // 渠道：不同服务商之前有不同的调用SDK，这里指定是调用哪个SDK，目前openai只有一个response，而google的可以用vertexai或者 ai-studio
+    string invoke_type = 4;                         // 模型调用类型：generation-生成模型调用
+    Input input = 5;                                // 传递给模型的输入内容，可以是文本、图像，用于生成响应
+    bool stream = 6;                                // 是否流式输出，默认false
+    optional string instructions = 7;               // （可选）system prompt
+    optional int32 max_output_tokens = 8;           // （可选）限制模型生成响应时的最大 token 数
+    optional float temperature = 9;                 // （可选）采样温度，取值范围为 0 到 2
+    optional float top_p = 10;                      // （可选）称为 nucleus sampling 的采样方法的参数，表示只考虑累计概率质量为 top_p 的 token
+    optional float timeout = 11;                    // （可选）覆盖客户端默认的超时设置，单位为秒
+    string org_id = 12;                             // 组织id
+    string user_id = 13;                            // 用户id
+    string client_type = 14;                        // 客户端类型，这里记录的是哪个服务请求过来的
+    optional int32 priority = 15;                   // （可选、预留字段）批量调用时执行的优先级
+    optional string custom_id = 16;                 // （可选）用于批量请求时结果关联
+    optional ThinkingConfig thinking_config = 17;   // （可选）思考功能配置
 }
 
 message ModelRequest {
