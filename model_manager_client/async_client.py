@@ -5,12 +5,17 @@ import logging
 import os
 
 import grpc
-from typing import Optional, AsyncIterator, Union
+from typing import Optional, AsyncIterator, Union, Iterable
+
+from openai import NOT_GIVEN
+from pydantic import BaseModel
 
 from .auth import JWTAuthHandler
+from .enums import ProviderType, InvokeType
 from .exceptions import ConnectionError, ValidationError
-from .schemas import ModelRequest, ModelResponse, TextInput, FileInput, BatchModelRequest, BatchModelResponse
+from .schemas import ModelRequest, ModelResponse, BatchModelRequest, BatchModelResponse
 from .generated import model_service_pb2, model_service_pb2_grpc
+from .schemas.inputs import GoogleGenAiInput, OpenAIResponsesInput, OpenAIChatCompletionsInput
 
 if not logging.getLogger().hasHandlers():
     # 配置日志格式
@@ -150,49 +155,87 @@ class AsyncModelManagerClient:
                 "user_id": model_request.user_context.user_id or ""
             }
 
-        # 构造 InputItem 列表
-        input_items = []
-        for item in model_request.input:
-            if isinstance(item, TextInput):
-                input_items.append(model_service_pb2.InputItem(
-                    text=model_service_pb2.TextInput(
-                        text=item.text
-                    )
-                ))
-            elif isinstance(item, FileInput):
-                input_items.append(model_service_pb2.InputItem(
-                    file=model_service_pb2.FileInput(
-                        file_url=item.file_url
-                    )
-                ))
+        # 动态根据 provider/invoke_type 决定使用哪个 input 字段
+        try:
+            if model_request.provider == ProviderType.GOOGLE:
+                allowed_fields = GoogleGenAiInput.model_fields.keys()
+            elif model_request.provider in {ProviderType.OPENAI, ProviderType.AZURE}:
+                if model_request.invoke_type in {InvokeType.RESPONSES, InvokeType.GENERATION}:
+                    allowed_fields = OpenAIResponsesInput.model_fields.keys()
+                elif model_request.invoke_type == InvokeType.CHAT_COMPLETIONS:
+                    allowed_fields = OpenAIChatCompletionsInput.model_fields.keys()
+                else:
+                    raise ValueError(f"暂不支持的调用类型: {model_request.invoke_type}")
             else:
-                raise ValidationError("Invalid input type, must be TextInput or ImageInput.")
-        thinking_config = None
-        if model_request.thinking_config and model_request.thinking_config.thinking_budget > 0:
-            thinking_config = model_service_pb2.ThinkingConfig(
-                include_thoughts=model_request.thinking_config.include_thoughts,
-                thinking_budget=model_request.thinking_config.thinking_budget,
+                raise ValueError(f"暂不支持的提供商: {model_request.provider}")
+
+            # 将 ModelRequest 转 dict，过滤只保留 base + allowed 的字段
+            model_request_dict = model_request.model_dump(exclude_unset=True)
+
+            grpc_request_kwargs = {}
+            for field in allowed_fields:
+                if field in model_request_dict:
+                    value = model_request_dict[field]
+
+                    # Skip fields with NotGiven or None (unless explicitly allowed)
+                    if value is NOT_GIVEN or value is None:
+                        continue
+
+                    # 特别处理：如果是自定义的 BaseModel 或特定类型
+                    if isinstance(value, BaseModel):
+                        grpc_request_kwargs[field] = value.model_dump()
+                    # 如果是 OpenAI / Google 里的自定义对象，通常有 dict() 方法
+                    elif hasattr(value, "dict") and callable(value.dict):
+                        grpc_request_kwargs[field] = value.dict()
+                    # 如果是 list，需要处理里面元素也是自定义对象的情况
+                    elif isinstance(value, Iterable) and not isinstance(value, (str, bytes, dict)):
+                        new_list = []
+                        for item in value:
+                            if isinstance(item, BaseModel):
+                                new_list.append(item.model_dump())
+                            elif hasattr(item, "dict") and callable(item.dict):
+                                new_list.append(item.dict())
+                            elif isinstance(item, dict):
+                                # Handle nested dictionaries
+                                nested_dict = {}
+                                for k, v in item.items():
+                                    if isinstance(v, BaseModel):
+                                        nested_dict[k] = v.model_dump()
+                                    elif hasattr(v, "dict") and callable(v.dict):
+                                        nested_dict[k] = v.dict()
+                                    else:
+                                        nested_dict[k] = v
+                                new_list.append(nested_dict)
+                            else:
+                                new_list.append(item)
+                        grpc_request_kwargs[field] = new_list
+                        # 如果是 dict，同理处理内部元素
+                    elif isinstance(value, dict):
+                        new_dict = {}
+                        for k, v in value.items():
+                            if isinstance(v, BaseModel):
+                                new_dict[k] = v.model_dump()
+                            elif hasattr(v, "dict") and callable(v.dict):
+                                new_dict[k] = v.dict()
+                            else:
+                                new_dict[k] = v
+                        grpc_request_kwargs[field] = new_dict
+                    else:
+                        grpc_request_kwargs[field] = value
+
+            request = model_service_pb2.ModelRequestItem(
+                provider=model_request.provider.value,
+                channel=model_request.channel.value,
+                invoke_type=model_request.invoke_type.value,
+                stream=model_request.stream or False,
+                org_id=model_request.user_context.org_id or "",
+                user_id=model_request.user_context.user_id or "",
+                client_type=model_request.user_context.client_type or "",
+                extra=grpc_request_kwargs
             )
 
-        request = model_service_pb2.ModelRequestItem(
-            model_provider=model_request.model_provider.value,
-            model_name=model_request.model_name or "",
-            channel=model_request.channel.value if model_request.channel else "",
-            invoke_type=model_request.invoke_type.value,
-            input=model_service_pb2.Input(contents=input_items),
-            stream=model_request.stream,
-            instructions=model_request.instructions or "",
-            max_output_tokens=model_request.max_output_tokens or 0,
-            temperature=model_request.temperature or 0.0,
-            top_p=model_request.top_p or 0.0,
-            timeout=model_request.timeout or 0.0,
-            org_id=model_request.user_context.org_id,
-            user_id=model_request.user_context.user_id,
-            client_type=model_request.user_context.client_type,
-            priority=1,
-            custom_id=model_request.custom_id or "",
-            thinking_config=thinking_config,
-        )
+        except Exception as e:
+            raise ValueError(f"构建请求失败: {str(e)}") from e
 
         metadata = self._build_auth_metadata()
 
@@ -206,7 +249,7 @@ class AsyncModelManagerClient:
                     usage=json.loads(response.usage) if response.usage else None,
                     raw_response=json.loads(response.raw_response) if response.raw_response else None,
                     error=response.error or None,
-                    custom_id=model_request.custom_id or None,
+                    custom_id=None,
                     request_id=response.request_id if response.request_id else None,
                 )
 
@@ -235,37 +278,89 @@ class AsyncModelManagerClient:
         # 构造批量请求
         items = []
         for model_request_item in batch_request_model.items:
-            # 构建 input contents
-            input_items = []
-            for item in model_request_item.input:
-                if isinstance(item, TextInput):
-                    input_items.append(model_service_pb2.InputItem(
-                        text=model_service_pb2.TextInput(text=item.text)
-                    ))
-                elif isinstance(item, FileInput):
-                    input_items.append(model_service_pb2.InputItem(
-                        file=model_service_pb2.FileInput(file_url=item.file_url)
-                    ))
+            # 动态根据 provider/invoke_type 决定使用哪个 input 字段
+            try:
+                if model_request_item.provider == ProviderType.GOOGLE:
+                    allowed_fields = GoogleGenAiInput.model_fields.keys()
+                elif model_request_item.provider in {ProviderType.OPENAI, ProviderType.AZURE}:
+                    if model_request_item.invoke_type in {InvokeType.RESPONSES, InvokeType.GENERATION}:
+                        allowed_fields = OpenAIResponsesInput.model_fields.keys()
+                    elif model_request_item.invoke_type == InvokeType.CHAT_COMPLETIONS:
+                        allowed_fields = OpenAIChatCompletionsInput.model_fields.keys()
+                    else:
+                        raise ValueError(f"暂不支持的调用类型: {model_request_item.invoke_type}")
+                else:
+                    raise ValueError(f"暂不支持的提供商: {model_request_item.provider}")
 
-            # 构建 ModelRequestItem
-            req_item = model_service_pb2.ModelRequestItem(
-                model_provider=model_request_item.model_provider.value,
-                model_name=model_request_item.model_name or "",
-                channel=model_request_item.channel.value if model_request_item.channel else "",
-                invoke_type=model_request_item.invoke_type.value,
-                input=model_service_pb2.Input(contents=input_items),
-                stream=False,
-                instructions=model_request_item.instructions or "",
-                max_output_tokens=model_request_item.max_output_tokens or 0,
-                temperature=model_request_item.temperature or 0.0,
-                top_p=model_request_item.top_p or 0.0,
-                org_id=batch_request_model.user_context.org_id,
-                user_id=batch_request_model.user_context.user_id,
-                client_type=batch_request_model.user_context.client_type,
-                priority=model_request_item.priority or 1,
-                custom_id=model_request_item.custom_id or "",
-            )
-            items.append(req_item)
+                # 将 ModelRequest 转 dict，过滤只保留 base + allowed 的字段
+                model_request_dict = model_request_item.model_dump(exclude_unset=True)
+
+                grpc_request_kwargs = {}
+                for field in allowed_fields:
+                    if field in model_request_dict:
+                        value = model_request_dict[field]
+
+                        # Skip fields with NotGiven or None (unless explicitly allowed)
+                        if value is NOT_GIVEN or value is None:
+                            continue
+
+                        # 特别处理：如果是自定义的 BaseModel 或特定类型
+                        if isinstance(value, BaseModel):
+                            grpc_request_kwargs[field] = value.model_dump()
+                        # 如果是 OpenAI / Google 里的自定义对象，通常有 dict() 方法
+                        elif hasattr(value, "dict") and callable(value.dict):
+                            grpc_request_kwargs[field] = value.dict()
+                        # 如果是 list，需要处理里面元素也是自定义对象的情况
+                        elif isinstance(value, Iterable) and not isinstance(value, (str, bytes, dict)):
+                            new_list = []
+                            for item in value:
+                                if isinstance(item, BaseModel):
+                                    new_list.append(item.model_dump())
+                                elif hasattr(item, "dict") and callable(item.dict):
+                                    new_list.append(item.dict())
+                                elif isinstance(item, dict):
+                                    # Handle nested dictionaries
+                                    nested_dict = {}
+                                    for k, v in item.items():
+                                        if isinstance(v, BaseModel):
+                                            nested_dict[k] = v.model_dump()
+                                        elif hasattr(v, "dict") and callable(v.dict):
+                                            nested_dict[k] = v.dict()
+                                        else:
+                                            nested_dict[k] = v
+                                    new_list.append(nested_dict)
+                                else:
+                                    new_list.append(item)
+                            grpc_request_kwargs[field] = new_list
+                            # 如果是 dict，同理处理内部元素
+                        elif isinstance(value, dict):
+                            new_dict = {}
+                            for k, v in value.items():
+                                if isinstance(v, BaseModel):
+                                    new_dict[k] = v.model_dump()
+                                elif hasattr(v, "dict") and callable(v.dict):
+                                    new_dict[k] = v.dict()
+                                else:
+                                    new_dict[k] = v
+                            grpc_request_kwargs[field] = new_dict
+                        else:
+                            grpc_request_kwargs[field] = value
+
+                items.append(model_service_pb2.ModelRequestItem(
+                    provider=model_request_item.provider.value,
+                    channel=model_request_item.channel.value,
+                    invoke_type=model_request_item.invoke_type.value,
+                    stream=model_request_item.stream or False,
+                    custom_id=model_request_item.custom_id or "",
+                    priority=model_request_item.priority or 1,
+                    org_id=batch_request_model.user_context.org_id or "",
+                    user_id=batch_request_model.user_context.user_id or "",
+                    client_type=batch_request_model.user_context.client_type or "",
+                    extra=grpc_request_kwargs,
+                ))
+
+            except Exception as e:
+                raise ValueError(f"构建请求失败: {str(e)}，item={model_request_item.custom_id}") from e
 
         try:
             # 超时处理逻辑

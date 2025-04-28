@@ -5,4 +5,4 @@ class ProviderType(str, Enum):
     """模型提供商类型枚举"""
     OPENAI = "openai"
     GOOGLE = "google"
-    AZURE_OPENAI = "azure-openai"
+    AZURE = "azure"
